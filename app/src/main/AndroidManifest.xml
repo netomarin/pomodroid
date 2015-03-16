@@ -17,11 +17,7 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name="br.com.netomarin.pomodroid.CountdownTimerService"
-            android:enabled="true"
-            android:exported="true" >
-        </service>
+        <service android:name=".PomodoroTimerService" />
     </application>
 
 </manifest>
