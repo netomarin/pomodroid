@@ -1,11 +1,9 @@
 package br.com.netomarin.pomodroid;
 
-import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
-import android.os.Binder;
 import android.os.CountDownTimer;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
@@ -41,26 +39,6 @@ public class PomodoroTimerService extends Service {
     private NotificationManager mNotificationManager;
     private NotificationCompat.Builder mBuilder;
 
-    public class CountdownBinder extends Binder {
-        PomodoroTimerService getService () {
-            return PomodoroTimerService.this;
-        }
-
-        public long getTimeLeft() {
-            return mTimeLeft;
-        }
-
-        public void startTimer() {
-            startCountdownTimer();
-        }
-
-        public void stopTimer() {
-            mCountDownTimer.cancel();
-        }
-    }
-
-    private final IBinder mBinder = new CountdownBinder();
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -78,7 +56,12 @@ public class PomodoroTimerService extends Service {
 
     private void startCountdownTimer() {
         mTimeLeft = Commons.MILLIS_PER_SECOND*Commons.SECONDS_PER_MINUTE*
-                (mCurrentState == STATE_POMODORO ? Pomodoro.DEFAULT_LENGHT : Pomodoro.DEFAULT_BREAK);
+                (mCurrentState == STATE_POMODORO ? Pomodoro.DEFAULT_LENGHT :
+                        Pomodoro.DEFAULT_BREAK);
+        /**
+         * Para testes
+         */
+        mTimeLeft = Commons.MILLIS_PER_SECOND * 10;
         mCountDownTimer = new CountDownTimer((mTimeLeft), Commons.MILLIS_PER_SECOND) {
             @Override
             public void onTick(long millisUntilFinished) {
@@ -92,7 +75,8 @@ public class PomodoroTimerService extends Service {
             public void onFinish() {
                 mTimeLeft = 0;
                 broadcastTic();
-                mNotificationManager.cancel(ONGOING_NOTIFICATION_ID);
+                mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                mNotificationManager.cancelAll();
                 if (mCurrentState == STATE_POMODORO) {
                     finishPomodoro();
                 } else if (mCurrentState == STATE_BREAK) {
@@ -131,8 +115,8 @@ public class PomodoroTimerService extends Service {
     }
 
     private void startNotification() {
-        Intent notificationIntent = new Intent(PomodroidMainActivity.class.getName());
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
+                new Intent(this, PomodroidMainActivity.class), 0);
 
         mBuilder = new NotificationCompat.Builder(this)
                 .setContentTitle(getNotificationTitle())
@@ -142,18 +126,19 @@ public class PomodoroTimerService extends Service {
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setOngoing(true)
                 .setContentIntent(pendingIntent);
-        Notification notification = mBuilder.build();
         mNotificationManager.cancel(FINISH_NOTIFICATION_ID);
-        startForeground(ONGOING_NOTIFICATION_ID, notification);
+        mNotificationManager.notify(ONGOING_NOTIFICATION_ID, mBuilder.build());
         Toast.makeText(this, getString(R.string.toast_pomodoro_started), Toast.LENGTH_SHORT).show();
     }
 
     private void refreshNotification() {
         long minsRemaining = mTimeLeft / Commons.MILLIS_PER_SECOND / Commons.SECONDS_PER_MINUTE;
+        int maxTimeValue = (int)(mCurrentState == STATE_POMODORO ? Pomodoro.DEFAULT_LENGHT :
+                Pomodoro.DEFAULT_BREAK);
         mBuilder.setContentTitle(getNotificationTitle())
                 .setContentText(getString(R.string.txt_time_remaining) + " " +
                         Commons.getRemainingTimeString(mTimeLeft))
-                .setProgress(25, 25 - (int) minsRemaining, false);
+                .setProgress(maxTimeValue, maxTimeValue - (int) minsRemaining, false);
 
         mNotificationManager.notify(ONGOING_NOTIFICATION_ID, mBuilder.build());
     }
@@ -161,14 +146,14 @@ public class PomodoroTimerService extends Service {
     private String getNotificationTitle() {
         switch (mCurrentState) {
             case STATE_READY:
-                return "Ready for a new pomodoro?";
+                return getString(R.string.txt_title_state_ready);
             case STATE_POMODORO:
-                return "Running a pomodoro...";
+                return getString(R.string.txt_title_state_pomodoro);
             case STATE_FINISHED:
-                return "Congratulations! Pomodoro finished!";
+                return getString(R.string.txt_title_state_finished);
             case STATE_BREAK:
-                return "Having a break :)";
-            default: return "Running a pomodoro...";
+                return getString(R.string.txt_title_state_break);
+            default: return getString(R.string.txt_title_state_pomodoro);
         }
     }
 
@@ -194,6 +179,7 @@ public class PomodoroTimerService extends Service {
     public void onDestroy() {
         Log.d("Pomodroid", "PomodoroTimerService destroy");
         mCountDownTimer.cancel();
+        mNotificationManager.cancelAll();
         stopSelf();
         super.onDestroy();
     }

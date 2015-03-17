@@ -6,5 +6,12 @@
     <string name="action_settings">Settings</string>
     <string name="txt_time_remaining">Time remaining:</string>
     <string name="toast_pomodoro_started">Pomodoro started!</string>
+    <string name="txt_pomodoro_finished">Congratulations! Pomodoro finished!</string>
+    <string name="txt_title_state_ready">Ready for a new pomodoro?</string>
+    <string name="txt_title_state_pomodoro">Running a pomodoro...</string>
+    <string name="txt_title_state_finished">Pomodoro finished!</string>
+    <string name="txt_title_state_break">Having a break :)</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_stop">Stop</string>
 
 </resources>

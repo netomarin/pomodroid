@@ -17,7 +17,8 @@ public class PomodroidMainActivity extends Activity {
 
     private long mTimeLeft;
 
-    private Button pomodoroButton;
+    private Button startPomodoroButton;
+    private Button stopPomodoroButton;
     private TextView timerTextView;
 
     private TimerTicReceiver timerTicReceiver;
@@ -30,11 +31,18 @@ public class PomodroidMainActivity extends Activity {
         setContentView(R.layout.activity_pomodroid_main);
 
         timerTextView = (TextView) findViewById(R.id.timerTextView);
-        pomodoroButton = (Button) findViewById(R.id.startPomodoroButton);
-        pomodoroButton.setOnClickListener(new View.OnClickListener() {
+        startPomodoroButton = (Button) findViewById(R.id.startPomodoroButton);
+        startPomodoroButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startPomodoro();
+            }
+        });
+        stopPomodoroButton = (Button) findViewById(R.id.stopPomodoroButton);
+        stopPomodoroButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stopPomodoro();
             }
         });
     }
@@ -69,11 +77,17 @@ public class PomodroidMainActivity extends Activity {
     }
 
     private void startPomodoro() {
-        startTimerService();
+        startTimerService(PomodoroTimerService.STATE_POMODORO);
     }
 
-    private void startTimerService() {
+    private void stopPomodoro() {
+        stopService(new Intent(this, PomodoroTimerService.class));
+    }
+
+    private void startTimerService(int state) {
         timerService = new Intent(this, PomodoroTimerService.class);
+        timerService.putExtra(PomodoroTimerService.TIMER_EXTRA_STATE,
+                PomodoroTimerService.STATE_POMODORO);
         startService(timerService);
     }
 
@@ -104,8 +118,13 @@ public class PomodroidMainActivity extends Activity {
         public void onReceive(Context context, Intent intent) {
             long timeLeft = intent.getLongExtra(PomodoroTimerService.TIC_BROADCAST_PAYLOAD, 0);
             int state = intent.getIntExtra(PomodoroTimerService.TIC_BROADCAST_STATE, 0);
-            timerTextView.setText(getString(R.string.txt_time_remaining) + " " +
-                    Commons.getRemainingTimeString(timeLeft));
+            if(timeLeft > 0) {
+                timerTextView.setText(getString(R.string.txt_time_remaining) + " " +
+                        Commons.getRemainingTimeString(timeLeft));
+            } else {
+                timerTextView.setText(getString(R.string.txt_pomodoro_finished));
+                currentState = PomodoroTimerService.STATE_FINISHED;
+            }
         }
     }
 }
