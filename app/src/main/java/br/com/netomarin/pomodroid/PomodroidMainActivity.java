@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -55,6 +56,11 @@ public class PomodroidMainActivity extends Activity {
             registerReceiver(timerTicReceiver, new IntentFilter(PomodoroTimerService.
                     TIC_BROADCAST_MESSAGE));
         }
+
+        SharedPreferences prefs = getSharedPreferences(Commons.PREFERENCES_NAME, MODE_PRIVATE);
+        currentState = prefs.getInt(PomodoroTimerService.PREF_LAST_STATE,
+                PomodoroTimerService.STATE_READY);
+        updatePomodoroMessage(0);
     }
 
     @Override
@@ -76,18 +82,54 @@ public class PomodroidMainActivity extends Activity {
         super.onStop();
     }
 
+    private void updatePomodoroMessage(long timeLeft) {
+        if(currentState == PomodoroTimerService.STATE_POMODORO ||
+                currentState == PomodoroTimerService.STATE_BREAK) {
+            timerTextView.setText(getString(R.string.txt_time_remaining) + " " +
+                    Commons.getRemainingTimeString(timeLeft));
+        } else if (currentState == PomodoroTimerService.STATE_FINISHED) {
+            timerTextView.setText(getString(R.string.txt_pomodoro_finished));
+        } else {
+            timerTextView.setText(getString(R.string.txt_state_ready));
+        }
+    }
+
+    private void updateCycleButtons() {
+        if (currentState == PomodoroTimerService.STATE_POMODORO ||
+                currentState == PomodoroTimerService.STATE_BREAK) {
+            startPomodoroButton.setEnabled(false);
+            stopPomodoroButton.setEnabled(true);
+        } else {
+            startPomodoroButton.setEnabled(true);
+            stopPomodoroButton.setEnabled(false);
+        }
+    }
+
     private void startPomodoro() {
-        startTimerService(PomodoroTimerService.STATE_POMODORO);
+        if (currentState == PomodoroTimerService.STATE_READY) {
+            currentState = PomodoroTimerService.STATE_POMODORO;
+        } else if (currentState == PomodoroTimerService.STATE_FINISHED) {
+            currentState = PomodoroTimerService.STATE_BREAK;
+        }
+        startTimerService(currentState);
+        updateCycleButtons();
     }
 
     private void stopPomodoro() {
         stopService(new Intent(this, PomodoroTimerService.class));
+        currentState = PomodoroTimerService.STATE_READY;
+        updateCycleButtons();
+        updatePomodoroMessage(0);
+        SharedPreferences.Editor editor = getSharedPreferences(Commons.PREFERENCES_NAME,
+                MODE_PRIVATE).edit();
+        editor.putInt(PomodoroTimerService.PREF_LAST_STATE, currentState);
+        editor.putLong(PomodoroTimerService.PREF_LAST_STATE_TIME, System.currentTimeMillis());
+        editor.commit();
     }
 
     private void startTimerService(int state) {
         timerService = new Intent(this, PomodoroTimerService.class);
-        timerService.putExtra(PomodoroTimerService.TIMER_EXTRA_STATE,
-                PomodoroTimerService.STATE_POMODORO);
+        timerService.putExtra(PomodoroTimerService.TIMER_EXTRA_STATE, state);
         startService(timerService);
     }
 
@@ -117,14 +159,12 @@ public class PomodroidMainActivity extends Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             long timeLeft = intent.getLongExtra(PomodoroTimerService.TIC_BROADCAST_PAYLOAD, 0);
-            int state = intent.getIntExtra(PomodoroTimerService.TIC_BROADCAST_STATE, 0);
-            if(timeLeft > 0) {
-                timerTextView.setText(getString(R.string.txt_time_remaining) + " " +
-                        Commons.getRemainingTimeString(timeLeft));
-            } else {
-                timerTextView.setText(getString(R.string.txt_pomodoro_finished));
-                currentState = PomodoroTimerService.STATE_FINISHED;
+            int broadcastState = intent.getIntExtra(PomodoroTimerService.TIC_BROADCAST_STATE, 0);
+            if (broadcastState != currentState) {
+                currentState = broadcastState;
+                updateCycleButtons();
             }
+            updatePomodoroMessage(timeLeft);
         }
     }
 }

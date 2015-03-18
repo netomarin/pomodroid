@@ -4,6 +4,9 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.net.Uri;
 import android.os.CountDownTimer;
 import android.os.IBinder;
 import android.support.v4.app.NotificationCompat;
@@ -21,6 +24,9 @@ public class PomodoroTimerService extends Service {
     public static final int STATE_BREAK = 3;
 
     public static final String TIMER_EXTRA_STATE = "STATE";
+
+    public static final String PREF_LAST_STATE = "last_state";
+    public static final String PREF_LAST_STATE_TIME = "last_state_time";
 
     /**
      * Configuration variables to the tic-tac broadcaster
@@ -51,6 +57,12 @@ public class PomodoroTimerService extends Service {
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         mCurrentState = intent.getIntExtra(TIMER_EXTRA_STATE, STATE_POMODORO);
         startCountdownTimer();
+
+        SharedPreferences.Editor editor = getSharedPreferences(Commons.PREFERENCES_NAME,
+                MODE_PRIVATE).edit();
+        editor.putInt(PREF_LAST_STATE, mCurrentState);
+        editor.commit();
+
         return super.onStartCommand(intent, flags, startId);
     }
 
@@ -82,6 +94,13 @@ public class PomodoroTimerService extends Service {
                 } else if (mCurrentState == STATE_BREAK) {
                     finishBreak();
                 }
+
+                broadcastTic();
+                SharedPreferences.Editor editor = getSharedPreferences(Commons.PREFERENCES_NAME,
+                        MODE_PRIVATE).edit();
+                editor.putInt(PREF_LAST_STATE, mCurrentState);
+                editor.putLong(PREF_LAST_STATE_TIME, System.currentTimeMillis());
+                editor.commit();
             }
         }.start();
         startNotification();
@@ -93,7 +112,8 @@ public class PomodoroTimerService extends Service {
                 .setContentTitle(getNotificationTitle())
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .setContentIntent(PendingIntent.getActivity(this, 0,
-                        new Intent(this, PomodroidMainActivity.class), 0));
+                        new Intent(this, PomodroidMainActivity.class), 0))
+                .setLights(Color.GREEN, 500, 500);
         mNotificationManager.notify(FINISH_NOTIFICATION_ID, mBuilder.build());
     }
 
@@ -103,7 +123,10 @@ public class PomodoroTimerService extends Service {
                 .setContentTitle(getNotificationTitle())
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .setContentIntent(PendingIntent.getActivity(this, 0,
-                        new Intent(this, PomodroidMainActivity.class), 0));
+                        new Intent(this, PomodroidMainActivity.class), 0))
+        .setVibrate(new long[] {0 , 1000})
+        .setSound(Uri.parse("android.resource://br.com.netomarin.pomodroid/" + R.raw.alarm_clock_sound_short))
+        .setLights(Color.YELLOW, 500, 500);
         mNotificationManager.notify(FINISH_NOTIFICATION_ID, mBuilder.build());
     }
 
@@ -125,7 +148,8 @@ public class PomodoroTimerService extends Service {
                 .setProgress((int)Pomodoro.DEFAULT_LENGHT, (int)Pomodoro.DEFAULT_LENGHT, false)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setOngoing(true)
-                .setContentIntent(pendingIntent);
+                .setContentIntent(pendingIntent)
+                .setLights(mCurrentState == STATE_POMODORO ? Color.RED : Color.YELLOW, 500, 500);
         mNotificationManager.cancel(FINISH_NOTIFICATION_ID);
         mNotificationManager.notify(ONGOING_NOTIFICATION_ID, mBuilder.build());
         Toast.makeText(this, getString(R.string.toast_pomodoro_started), Toast.LENGTH_SHORT).show();
@@ -138,7 +162,8 @@ public class PomodoroTimerService extends Service {
         mBuilder.setContentTitle(getNotificationTitle())
                 .setContentText(getString(R.string.txt_time_remaining) + " " +
                         Commons.getRemainingTimeString(mTimeLeft))
-                .setProgress(maxTimeValue, maxTimeValue - (int) minsRemaining, false);
+                .setProgress(maxTimeValue, maxTimeValue - (int) minsRemaining, false)
+                .setLights(mCurrentState == STATE_POMODORO ? Color.RED : Color.YELLOW, 500, 500);
 
         mNotificationManager.notify(ONGOING_NOTIFICATION_ID, mBuilder.build());
     }

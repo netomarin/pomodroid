@@ -2,7 +2,6 @@
 <resources>
 
     <string name="app_name">Pomodroid</string>
-    <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
     <string name="txt_time_remaining">Time remaining:</string>
     <string name="toast_pomodoro_started">Pomodoro started!</string>
@@ -13,5 +12,6 @@
     <string name="txt_title_state_break">Having a break :)</string>
     <string name="btn_start">Start</string>
     <string name="btn_stop">Stop</string>
+    <string name="txt_state_ready">Ready to start a Pomodoro?</string>
 
 </resources>
