@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -15,6 +16,11 @@ import android.widget.TextView;
 
 
 public class PomodroidMainActivity extends Activity {
+    public static final String EXTRA_NOTIFICATION_ACTION_NAME = "notification_action";
+    public static final int EXTRA_ACTION_RESTART_POMODORO = 0;
+    public static final int EXTRA_ACTION_START_POMODORO = 1;
+    public static final int EXTRA_ACTION_START_BREAK = 2;
+    public static final int EXTRA_ACTION_STOP = 3;
 
     private long mTimeLeft;
 
@@ -57,10 +63,33 @@ public class PomodroidMainActivity extends Activity {
                     TIC_BROADCAST_MESSAGE));
         }
 
-        SharedPreferences prefs = getSharedPreferences(Commons.PREFERENCES_NAME, MODE_PRIVATE);
-        currentState = prefs.getInt(PomodoroTimerService.PREF_LAST_STATE,
-                PomodoroTimerService.STATE_READY);
-        updatePomodoroMessage(0);
+        Intent actionIntent = getIntent();
+        if (actionIntent != null &&
+                actionIntent.getIntExtra(EXTRA_NOTIFICATION_ACTION_NAME, -1) != -1) {
+            Log.d("Pomodroid", "Action from notification!");
+
+            int notificationAction = actionIntent.getIntExtra(EXTRA_NOTIFICATION_ACTION_NAME, -1);
+            switch (notificationAction) {
+                case EXTRA_ACTION_RESTART_POMODORO:
+                case EXTRA_ACTION_START_POMODORO:
+                    currentState = PomodoroTimerService.STATE_READY;
+                    startPomodoro();
+                    break;
+                case EXTRA_ACTION_START_BREAK:
+                    currentState = PomodoroTimerService.STATE_FINISHED;
+                    startPomodoro();
+                    break;
+                case EXTRA_ACTION_STOP:
+                    stopPomodoro();
+                    break;
+            }
+            getIntent().removeExtra(EXTRA_NOTIFICATION_ACTION_NAME);
+        } else {
+            SharedPreferences prefs = getSharedPreferences(Commons.PREFERENCES_NAME, MODE_PRIVATE);
+            currentState = prefs.getInt(PomodoroTimerService.PREF_LAST_STATE,
+                    PomodoroTimerService.STATE_READY);
+            updatePomodoroMessage(0);
+        }
     }
 
     @Override
@@ -110,6 +139,8 @@ public class PomodroidMainActivity extends Activity {
             currentState = PomodoroTimerService.STATE_POMODORO;
         } else if (currentState == PomodoroTimerService.STATE_FINISHED) {
             currentState = PomodoroTimerService.STATE_BREAK;
+        } else {
+            throw new IllegalStateException("Pomodoro state not recognized");
         }
         startTimerService(currentState);
         updateCycleButtons();

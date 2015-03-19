@@ -108,25 +108,57 @@ public class PomodoroTimerService extends Service {
 
     private void finishBreak() {
         mCurrentState = STATE_READY;
+
+        Intent startIntent = new Intent(this, PomodroidMainActivity.class);
+        startIntent.putExtra(PomodroidMainActivity.EXTRA_NOTIFICATION_ACTION_NAME,
+                PomodroidMainActivity.EXTRA_ACTION_START_POMODORO);
+//        startIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
         mBuilder = new NotificationCompat.Builder(this)
                 .setContentTitle(getNotificationTitle())
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .setContentIntent(PendingIntent.getActivity(this, 0,
-                        new Intent(this, PomodroidMainActivity.class), 0))
-                .setLights(Color.GREEN, 500, 500);
+                        new Intent(this, PomodroidMainActivity.class),
+                        PendingIntent.FLAG_CANCEL_CURRENT))
+                .setLights(Color.GREEN, 500, 500)
+                .addAction(android.R.drawable.ic_media_play, getString(R.string.btn_start),
+                        PendingIntent.getActivity(this, STATE_POMODORO, startIntent,
+                                PendingIntent.FLAG_CANCEL_CURRENT));
         mNotificationManager.notify(FINISH_NOTIFICATION_ID, mBuilder.build());
     }
 
     private void finishPomodoro() {
         mCurrentState = STATE_FINISHED;
+
+        Intent startBreakIntent = new Intent(this, PomodroidMainActivity.class);
+        startBreakIntent.putExtra(PomodroidMainActivity.EXTRA_NOTIFICATION_ACTION_NAME,
+                PomodroidMainActivity.EXTRA_ACTION_START_BREAK);
+//        startBreakIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+        Intent restartIntent = new Intent(this, PomodroidMainActivity.class);
+        restartIntent.putExtra(PomodroidMainActivity.EXTRA_NOTIFICATION_ACTION_NAME,
+                PomodroidMainActivity.EXTRA_ACTION_RESTART_POMODORO);
+//        restartIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
         mBuilder = new NotificationCompat.Builder(this)
                 .setContentTitle(getNotificationTitle())
                 .setSmallIcon(android.R.drawable.ic_dialog_alert)
                 .setContentIntent(PendingIntent.getActivity(this, 0,
                         new Intent(this, PomodroidMainActivity.class), 0))
-        .setVibrate(new long[] {0 , 1000})
-        .setSound(Uri.parse("android.resource://br.com.netomarin.pomodroid/" + R.raw.alarm_clock_sound_short))
-        .setLights(Color.YELLOW, 500, 500);
+                .setVibrate(new long[]{0, 1000})
+                .setSound(Uri.parse("android.resource://br.com.netomarin.pomodroid/" +
+                        R.raw.alarm_clock_sound_short))
+                .setLights(Color.YELLOW, 500, 500)
+                .setAutoCancel(true);
+
+        mBuilder.addAction(android.R.drawable.ic_media_play, getString(R.string.btn_start_break),
+                        PendingIntent.getActivity(this, STATE_BREAK, startBreakIntent,
+                                PendingIntent.FLAG_CANCEL_CURRENT));
+
+        mBuilder.addAction(android.R.drawable.ic_menu_revert, getString(R.string.btn_restart),
+                        PendingIntent.getActivity(this, STATE_POMODORO, restartIntent,
+                                PendingIntent.FLAG_CANCEL_CURRENT));
+
         mNotificationManager.notify(FINISH_NOTIFICATION_ID, mBuilder.build());
     }
 
@@ -139,7 +171,12 @@ public class PomodoroTimerService extends Service {
 
     private void startNotification() {
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
-                new Intent(this, PomodroidMainActivity.class), 0);
+                new Intent(this, PomodroidMainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP), 0);
+
+        Intent stopIntent = new Intent(this, PomodroidMainActivity.class);
+        stopIntent.putExtra(PomodroidMainActivity.EXTRA_NOTIFICATION_ACTION_NAME,
+                PomodroidMainActivity.EXTRA_ACTION_RESTART_POMODORO);
 
         mBuilder = new NotificationCompat.Builder(this)
                 .setContentTitle(getNotificationTitle())
@@ -149,7 +186,21 @@ public class PomodoroTimerService extends Service {
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setOngoing(true)
                 .setContentIntent(pendingIntent)
-                .setLights(mCurrentState == STATE_POMODORO ? Color.RED : Color.YELLOW, 500, 500);
+                .setLights(mCurrentState == STATE_POMODORO ? Color.RED : Color.YELLOW, 500, 500)
+                .addAction(android.R.drawable.ic_media_pause, getString(R.string.btn_stop),
+                        PendingIntent.getActivity(this, STATE_BREAK, stopIntent,
+                                PendingIntent.FLAG_CANCEL_CURRENT));
+
+        if (mCurrentState == STATE_POMODORO) {
+            Intent restartIntent = new Intent(this, PomodroidMainActivity.class);
+            restartIntent.putExtra(PomodroidMainActivity.EXTRA_NOTIFICATION_ACTION_NAME,
+                    PomodroidMainActivity.EXTRA_ACTION_RESTART_POMODORO);
+            
+            mBuilder.addAction(android.R.drawable.ic_menu_revert, getString(R.string.btn_restart),
+                    PendingIntent.getActivity(this, STATE_POMODORO, restartIntent,
+                            PendingIntent.FLAG_CANCEL_CURRENT));
+        }
+
         mNotificationManager.cancel(FINISH_NOTIFICATION_ID);
         mNotificationManager.notify(ONGOING_NOTIFICATION_ID, mBuilder.build());
         Toast.makeText(this, getString(R.string.toast_pomodoro_started), Toast.LENGTH_SHORT).show();

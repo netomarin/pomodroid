@@ -13,5 +13,7 @@
     <string name="btn_start">Start</string>
     <string name="btn_stop">Stop</string>
     <string name="txt_state_ready">Ready to start a Pomodoro?</string>
+    <string name="btn_restart">Restart</string>
+    <string name="btn_start_break">Have a break</string>
 
 </resources>
