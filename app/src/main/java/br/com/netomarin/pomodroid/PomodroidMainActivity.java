@@ -14,8 +14,20 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.wearable.MessageApi;
+import com.google.android.gms.wearable.Node;
+import com.google.android.gms.wearable.NodeApi;
+import com.google.android.gms.wearable.Wearable;
 
-public class PomodroidMainActivity extends Activity {
+
+public class PomodroidMainActivity extends Activity
+        implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+
+    private static final String WEAR_MESSAGE_START_ACTIVITY = "/start_activity";
+    private static final String WEAR_MESSAGE_TIME_LEFT = "/time_left";
+
     public static final String EXTRA_NOTIFICATION_ACTION_NAME = "notification_action";
     public static final int EXTRA_ACTION_RESTART_POMODORO = 0;
     public static final int EXTRA_ACTION_START_POMODORO = 1;
@@ -31,6 +43,9 @@ public class PomodroidMainActivity extends Activity {
     private TimerTicReceiver timerTicReceiver;
     private Intent timerService;
     private int currentState;
+
+    private GoogleApiClient mApiClient;
+    private boolean wearConnected;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,6 +105,8 @@ public class PomodroidMainActivity extends Activity {
                     PomodoroTimerService.STATE_READY);
             updatePomodoroMessage(0);
         }
+
+        initGoogleApiClient();
     }
 
     @Override
@@ -109,6 +126,13 @@ public class PomodroidMainActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        wearConnected = false;
+        mApiClient.disconnect();
     }
 
     private void updatePomodoroMessage(long timeLeft) {
@@ -135,6 +159,7 @@ public class PomodroidMainActivity extends Activity {
     }
 
     private void startPomodoro() {
+        sendMessage(WEAR_MESSAGE_START_ACTIVITY, "");
         if (currentState == PomodoroTimerService.STATE_READY) {
             currentState = PomodoroTimerService.STATE_POMODORO;
         } else if (currentState == PomodoroTimerService.STATE_FINISHED) {
@@ -186,9 +211,51 @@ public class PomodroidMainActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
+    private void initGoogleApiClient() {
+        mApiClient = new GoogleApiClient.Builder(this)
+                .addApi( Wearable.API )
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+
+        mApiClient.connect();
+    }
+
+    private void sendMessage(final String path, final String text) {
+        new Thread( new Runnable() {
+            @Override
+            public void run() {
+                NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.
+                        getConnectedNodes(mApiClient ).await();
+                for(Node node : nodes.getNodes()) {
+                    MessageApi.SendMessageResult result =
+                            Wearable.MessageApi.sendMessage(mApiClient,
+                                    node.getId(), path, text.getBytes() ).await();
+                }
+            }
+        }).start();
+    }
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        wearConnected = true;
+        sendMessage(WEAR_MESSAGE_START_ACTIVITY, "");
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        wearConnected = false;
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+        wearConnected = false;
+    }
+
     private class TimerTicReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
+            //código para obter os dados do tick do pomodoro
             long timeLeft = intent.getLongExtra(PomodoroTimerService.TIC_BROADCAST_PAYLOAD, 0);
             int broadcastState = intent.getIntExtra(PomodoroTimerService.TIC_BROADCAST_STATE, 0);
             if (broadcastState != currentState) {
@@ -196,6 +263,7 @@ public class PomodroidMainActivity extends Activity {
                 updateCycleButtons();
             }
             updatePomodoroMessage(timeLeft);
+            sendMessage(WEAR_MESSAGE_TIME_LEFT, Commons.getRemainingTimeString(timeLeft));
         }
     }
 }
